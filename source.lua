@@ -8,11 +8,19 @@ local CoreGui = game:GetService("CoreGui")
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Libraries >>---
-local UILibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/Library.lua"))()
-local ThemeManager =
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/addons/ThemeManager.lua"))()
-local SaveManager =
-	loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/addons/SaveManager.lua"))()
+local UILibrary = loadstring(
+	game:HttpGetAsync("https://github.com/ActualMasterOogway/Fluent-Renewed/releases/latest/download/Fluent.luau")
+)()
+local SaveManager = loadstring(
+	game:HttpGetAsync(
+		"https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/SaveManager.luau"
+	)
+)()
+local InterfaceManager = loadstring(
+	game:HttpGetAsync(
+		"https://raw.githubusercontent.com/ActualMasterOogway/Fluent-Renewed/master/Addons/InterfaceManager.luau"
+	)
+)()
 local Maid = getgenv().NVRMR_REQUIRE("maid")
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
@@ -79,15 +87,23 @@ end
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Interface >>---
 local Window = UILibrary:CreateWindow({
-	Title = game.Name .. " - CioKiTTY",
-	Center = true,
-	AutoShow = true,
+	Title = `{game.Name} Script`,
+	SubTitle = "by CioKiTTY",
+	TabWidth = 160,
+	Size = UDim2.fromOffset(830, 525),
+	Resize = true,
+	MinSize = Vector2.new(470, 380),
+	Acrylic = false,
+	Theme = "Dark",
+	MinimizeKey = Enum.KeyCode.RightShift,
 })
 
 local Tabs = {
-    ESP = Window:AddTab("ESP"),
-	Settings = Window:AddTab("Settings"),
+	ESP = Window:CreateTab({ Title = "ESP", Icon = "radar" }),
+	Settings = Window:CreateTab({ Title = "Settings", Icon = "settings" }),
 }
+
+local Elements = UILibrary.Options
 
 --<< Elements >>--
 --< ESP
@@ -96,48 +112,21 @@ do
 
 	-- Players
 	do
-		local box = tab:AddLeftGroupbox("Players")
+		local section = tab:AddSection("Players")
 
-		box:AddDivider()
-
-		box:AddToggle("playerESPEnabled", {
-			Text = "ESP Enabled",
+		section:CreateToggle("playerESPEnabled", {
+			Title = "ESP Enabled",
 			Default = cfg.playerESPEnabled,
-			Tooltip = "Enable it to see players ESP",
 		})
 	end
 
-    -- Monsters
+	-- Monsters
 	do
-		local box = tab:AddRightGroupbox("Monsters")
+		local section = tab:AddSection("Monsters")
 
-		box:AddDivider()
-
-		box:AddToggle("monstersESPEnabled", {
-			Text = "ESP Enabled",
+		Elements["monstersESPEnabled"] = section:CreateToggle("monstersESPEnabled", {
+			Title = "ESP Enabled",
 			Default = cfg.monstersESPEnabled,
-			Tooltip = "Enable it to see monsters ESP",
-		})
-	end
-end
-
---< Settings
-do
-	local tab = Tabs.Settings
-
-	do
-		local box = tab:AddLeftGroupbox("Menu")
-
-		box:AddDivider()
-
-		box:AddButton("Unload", function()
-			UILibrary:Unload()
-		end)
-
-		box:AddLabel("Toggle UI Keybind"):AddKeyPicker("UIKeybind", {
-			Default = "RightShift",
-			NoUI = true,
-			Text = "Toggle UI Keybind",
 		})
 	end
 end
@@ -145,51 +134,49 @@ end
 --<< Logic >>--
 --< ESP
 do
-	Toggles["playerESPEnabled"]:OnChanged(function()
-		cfg.playerESPEnabled = Toggles["playerESPEnabled"].Value
+	Elements["playerESPEnabled"]:OnChanged(function()
+		cfg.playerESPEnabled = Elements["playerESPEnabled"].Value
 
-        if cfg.playerESPEnabled then
+		if cfg.playerESPEnabled then
 			for _, player in ipairs(Players:GetPlayers()) do
-                highlightPlayer(player.Character)
-            end
+				highlightPlayer(player.Character)
+			end
 		else
-            for _, player in ipairs(Players:GetPlayers()) do
-                unhighlightPlayer(player.Character)
-            end
-        end
+			for _, player in ipairs(Players:GetPlayers()) do
+				unhighlightPlayer(player.Character)
+			end
+		end
 	end)
 
-    Toggles["monstersESPEnabled"]:OnChanged(function()
-		cfg.monstersESPEnabled = Toggles["monstersESPEnabled"].Value
+	Elements["monstersESPEnabled"]:OnChanged(function()
+		cfg.monstersESPEnabled = Elements["monstersESPEnabled"].Value
 
-        if cfg.monstersESPEnabled then
+		if cfg.monstersESPEnabled then
 			highlightMonsters()
 		else
-            unhighlightMonsters()
-        end
+			unhighlightMonsters()
+		end
 	end)
 end
 
 --< Settings
 do
-	UILibrary.ToggleKeybind = Options.UIKeybind
-
-	ThemeManager:SetLibrary(UILibrary)
 	SaveManager:SetLibrary(UILibrary)
+	InterfaceManager:SetLibrary(UILibrary)
 
 	SaveManager:IgnoreThemeSettings()
-	SaveManager:SetIgnoreIndexes({ "UIKeybind" })
+	SaveManager:SetIgnoreIndexes({})
 
-	ThemeManager:SetFolder("CioKiTTY")
 	SaveManager:SetFolder("CioKiTTY/IdentityFraud")
+	InterfaceManager:SetFolder("CioKiTTY")
 
-    ThemeManager:ApplyToTab(Tabs.Settings)
 	SaveManager:BuildConfigSection(Tabs.Settings)
+	InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 
-    SaveManager:LoadAutoloadConfig()
+	SaveManager:LoadAutoloadConfig()
 end
 
-UILibrary:OnUnload(function()
+UILibrary.OnUnload:Connect(function()
 	maid:DoCleaning()
 
 	highlighter:Destroy()
@@ -221,7 +208,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 		continue
 	end
 
-    highlightPlayer(player.Character)
+	highlightPlayer(player.Character)
 	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)

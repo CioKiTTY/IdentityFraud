@@ -29,4 +29,4 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/IdentityFrau
 
 - [CioKiTTY](https://github.com/CioKiTTY): Scripting
 - [Ported Version](https://github.com/CioKiTTY/NevermoreModules) of [NevermoreEngine](https://github.com/Quenty/NevermoreEngine): Utility Package (Maid)
-- [Modified Version](https://github.com/CioKiTTY/LinoriaLib) of [LinoriaLib](https://github.com/violin-suzutsuki/LinoriaLib): UI Library
+- [Fluent Renewed](https://github.com/ActualMasterOogway/Fluent-Renewed): UI Library
