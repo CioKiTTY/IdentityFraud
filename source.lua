@@ -93,7 +93,7 @@ local function mark()
 	local rayOrigin = mouse.UnitRay.Origin
 	local rayDirection = mouse.UnitRay.Direction * 20
 	local raycastParams = RaycastParams.new()
-	raycastParams.FilterDescendantsInstances = { character }
+	raycastParams.FilterDescendantsInstances = { character, workspace.CurrentCamera:WaitForChild("Light_Source"), workspace:WaitForChild(`{localPlayer.Name}_Crumbs`) }
 	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
 	local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
