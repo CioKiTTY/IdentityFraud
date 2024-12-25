@@ -192,9 +192,7 @@ end
 UILibrary:OnUnload(function()
 	maid:DoCleaning()
 
-	for _, player in ipairs(Players:GetPlayers()) do
-		unhighlightPlayer(player.Character)
-	end
+	highlighter:Destroy()
 end)
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
