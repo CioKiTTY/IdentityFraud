@@ -24,6 +24,10 @@ cfg.playerESPEnabled = true
 cfg.monstersESPEnabled = true
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
+---<< Variables >---
+local maid = Maid.new()
+
+--<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Game Objects >>---
 local npcs: Model = workspace:WaitForChild("NPCs")
 local highlighter: Folder = Instance.new("Folder")
@@ -127,7 +131,7 @@ do
 		box:AddDivider()
 
 		box:AddButton("Unload", function()
-			Maid:DoCleaning()
+			maid:DoCleaning()
 			UILibrary:Unload()
 		end)
 
@@ -193,8 +197,8 @@ highlighter.Parent = CoreGui
 --< ESP
 highlightMonsters()
 
-Maid:GiveTask(Players.PlayerAdded:Connect(function(player)
-	Maid:GiveTask(player.CharacterAdded:Connect(function(character)
+maid:GiveTask(Players.PlayerAdded:Connect(function(player)
+	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
 		end
@@ -207,7 +211,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 	end
 
     highlightPlayer(player.Character)
-	Maid:GiveTask(player.CharacterAdded:Connect(function(character)
+	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
 		end
