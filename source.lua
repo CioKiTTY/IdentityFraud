@@ -28,8 +28,8 @@ local Maid = getgenv().NVRMR_REQUIRE("maid")
 local cfg = {}
 
 --<< ESP
-cfg.playerESPEnabled = true
-cfg.monstersESPEnabled = true
+cfg.playerESPEnabled = false
+cfg.monstersESPEnabled = false
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Variables >---
@@ -81,6 +81,22 @@ local function unhighlightPlayer(character: Model)
 
 	if highlight then
 		highlight:Destroy()
+	end
+end
+
+local function highlightAllPlayers()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == Players.LocalPlayer then
+			continue
+		end
+
+		highlightPlayer(player.Character)
+	end
+end
+
+local function unhighlightAllPlayers()
+	for _, player in ipairs(Players:GetPlayers()) do
+		unhighlightPlayer(player.Character)
 	end
 end
 
@@ -138,13 +154,9 @@ do
 		cfg.playerESPEnabled = Elements["playerESPEnabled"].Value
 
 		if cfg.playerESPEnabled then
-			for _, player in ipairs(Players:GetPlayers()) do
-				highlightPlayer(player.Character)
-			end
+			highlightAllPlayers()
 		else
-			for _, player in ipairs(Players:GetPlayers()) do
-				unhighlightPlayer(player.Character)
-			end
+			unhighlightAllPlayers()
 		end
 	end)
 
@@ -208,7 +220,9 @@ for _, player in ipairs(Players:GetPlayers()) do
 		continue
 	end
 
-	highlightPlayer(player.Character)
+	if cfg.playerESPEnabled then
+		highlightPlayer(player.Character)
+	end
 	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
