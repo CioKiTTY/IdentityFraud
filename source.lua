@@ -99,7 +99,20 @@ do
 		box:AddToggle("playerESPEnabled", {
 			Text = "ESP Enabled",
 			Default = cfg.playerESPEnabled,
-			Tooltip = "Enable it to see Players ESP",
+			Tooltip = "Enable it to see players ESP",
+		})
+	end
+
+    -- Monsters
+	do
+		local box = tab:AddRightGroupbox("Monsters")
+
+		box:AddDivider()
+
+		box:AddToggle("monstersESPEnabled", {
+			Text = "ESP Enabled",
+			Default = cfg.monstersESPEnabled,
+			Tooltip = "Enable it to see monsters ESP",
 		})
 	end
 end
@@ -136,6 +149,14 @@ do
             for _, player in ipairs(Players:GetPlayers()) do
                 unhighlightPlayer(player.Character)
             end
+        end
+	end)
+
+    Toggles["monstersESPEnabled"]:OnChanged(function()
+		cfg.monstersESPEnabled = Toggles["monstersESPEnabled"].Value
+
+        if not cfg.monstersESPEnabled then
+            unhighlightMonsters()
         end
 	end)
 end
