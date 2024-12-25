@@ -8,6 +8,11 @@ local CoreGui = game:GetService("CoreGui")
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Libraries >>---
+local UILibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/Library.lua"))()
+local ThemeManager =
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager =
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/CioKiTTY/LinoriaLib/main/addons/SaveManager.lua"))()
 local Maid = getgenv().NVRMR_REQUIRE("maid")
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
@@ -55,6 +60,7 @@ local function highlightPlayer(character: Model)
 		highlight.FillColor = Color3.fromRGB(0, 255, 0)
 		highlight.Adornee = character
 		highlight.Parent = highlighter
+		highlight:SetAttribute("Type", "Player")
 	end
 end
 
@@ -64,6 +70,61 @@ local function unhighlightPlayer(character: Model)
 	if highlight then
 		highlight:Destroy()
 	end
+end
+
+--<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
+---<< Interface >>---
+local Window = UILibrary:CreateWindow({
+	Title = game.Name .. " - CioKiTTY",
+	Center = true,
+	AutoShow = true,
+})
+
+local Tabs = {
+	Settings = Window:AddTab("Settings"),
+}
+
+--<< Elements >>--
+--< Settings
+do
+	local tab = Tabs.Settings
+
+	do
+		local box = tab:AddLeftGroupbox("Menu")
+
+		box:AddDivider()
+
+		box:AddButton("Unload", function()
+			Maid:DoCleaning()
+			UILibrary:Unload()
+		end)
+
+		box:AddLabel("Toggle UI Keybind"):AddKeyPicker("UIKeybind", {
+			Default = "RightShift",
+			NoUI = true,
+			Text = "Toggle UI Keybind",
+		})
+	end
+end
+
+--<< Logic >>--
+--< Settings
+do
+	UILibrary.ToggleKeybind = Options.UIKeybind
+
+	ThemeManager:SetLibrary(UILibrary)
+	SaveManager:SetLibrary(UILibrary)
+
+	SaveManager:IgnoreThemeSettings()
+	SaveManager:SetIgnoreIndexes({ "UIKeybind" })
+
+	ThemeManager:SetFolder("CioKiTTY")
+	SaveManager:SetFolder("CioKiTTY/IdentityFraud")
+
+    ThemeManager:ApplyToTab(Tabs.Settings)
+	SaveManager:BuildConfigSection(Tabs.Settings)
+
+    SaveManager:LoadAutoloadConfig()
 end
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
