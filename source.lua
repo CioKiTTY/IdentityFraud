@@ -81,10 +81,29 @@ local Window = UILibrary:CreateWindow({
 })
 
 local Tabs = {
+    ESP = Window:AddTab("ESP"),
 	Settings = Window:AddTab("Settings"),
 }
 
 --<< Elements >>--
+--< ESP
+do
+	local tab = Tabs.ESP
+
+	-- Players
+	do
+		local box = tab:AddLeftGroupbox("Players")
+
+		box:AddDivider()
+
+		box:AddToggle("playerESPEnabled", {
+			Text = "ESP Enabled",
+			Default = cfg.playerESPEnabled,
+			Tooltip = "Enable it to see Players ESP",
+		})
+	end
+end
+
 --< Settings
 do
 	local tab = Tabs.Settings
@@ -108,6 +127,19 @@ do
 end
 
 --<< Logic >>--
+--< ESP
+do
+	Toggles["playerESPEnabled"]:OnChanged(function()
+		cfg.playerESPEnabled = Toggles["playerESPEnabled"].Value
+
+        if not cfg.playerESPEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                unhighlightPlayer(player.Character)
+            end
+        end
+	end)
+end
+
 --< Settings
 do
 	UILibrary.ToggleKeybind = Options.UIKeybind
