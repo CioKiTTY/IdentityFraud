@@ -10,4 +10,5 @@ A script for the roblox game [Identity Fraud](https://www.roblox.com/games/33852
 ## Credit
 
 - [CioKiTTY](https://github.com/CioKiTTY): Scripting
+- [Ported Version](https://github.com/CioKiTTY/NevermoreModules) of [NevermoreEngine](https://github.com/Quenty/NevermoreEngine): Utility Package (Maid)
 - [Modified Version](https://github.com/CioKiTTY/LinoriaLib) of [LinoriaLib](https://github.com/violin-suzutsuki/LinoriaLib): UI Library
