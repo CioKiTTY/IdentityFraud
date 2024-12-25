@@ -43,6 +43,7 @@ local pathTarget = nil :: Model
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Game Objects >>---
 local localPlayer = Players.LocalPlayer
+local mouse = localPlayer:GetMouse()
 local npcs: Model = workspace:WaitForChild("NPCs")
 
 local highlighter: Folder = Instance.new("Folder")
@@ -85,6 +86,30 @@ end
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Core Functions >>---
+--<< World Functions >>--
+local function mark()
+	local character = localPlayer.Character
+
+	local rayOrigin = mouse.UnitRay.Origin
+	local rayDirection = mouse.UnitRay.Direction * 20
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = { character }
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+	local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+	if result then
+		local hitPosition = result.Position
+
+		local characterPosition = character.PrimaryPart.Position
+		local lookVector = (hitPosition - characterPosition).Unit
+
+		local markCFrame = CFrame.new(hitPosition, hitPosition + Vector3.new(lookVector.X, 0, lookVector.Z))
+
+		game:GetService("ReplicatedStorage").Mark:FireServer(markCFrame)
+	end
+end
+
 --<< ESP Functions >>--
 local function highlightMonsters()
 	if not isHighlighted(npcs) then
@@ -248,6 +273,7 @@ local Window = UILibrary:CreateWindow({
 })
 
 local Tabs = {
+	World = Window:CreateTab({ Title = "World", Icon = "earth" }),
 	ESP = Window:CreateTab({ Title = "ESP", Icon = "radar" }),
 	PathFinder = Window:CreateTab({ Title = "Path Finder", Icon = "route" }),
 	Settings = Window:CreateTab({ Title = "Settings", Icon = "settings" }),
@@ -256,6 +282,27 @@ local Tabs = {
 local Elements = UILibrary.Options
 
 --<< Elements >>--
+--< World
+do
+	local tab = Tabs.World
+
+	tab:CreateKeybind("markKeybind", {
+		Title = "Mark Keybind",
+		Mode = "Toggle",
+		Default = "E",
+		ChangedCallback = function(newKey: Enum.KeyCode)
+			if newKey == Enum.KeyCode.Q then
+				Elements["markKeybind"]:SetValue("E")
+				UILibrary:Notify({
+					Title = "Invalid Keybind",
+					Content = "You can't set the keybind to Q",
+					Duration = 5,
+				})
+			end
+		end
+	})
+end
+
 --< ESP
 do
 	local tab = Tabs.ESP
@@ -287,9 +334,9 @@ do
 
 	tab:CreateDropdown("pathFindTarget", {
 		Title = "Target",
-		Values = {"None"},
+		Values = { "None" },
 		Multi = false,
-		Default = 1
+		Default = 1,
 	})
 
 	tab:CreateToggle("loopFindPath", {
@@ -327,6 +374,13 @@ do
 end
 
 --<< Logic >>--
+--< World
+do
+	Elements["markKeybind"]:OnClick(function()
+		mark()
+	end)
+end
+
 --< ESP
 do
 	Elements["playerESPEnabled"]:OnChanged(function()
@@ -449,7 +503,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 	end
 	pathTargetLists[player.Name] = player.Character
 	refreshPathTargetList()
-	
+
 	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
@@ -457,7 +511,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 
 		pathTargetLists[player.Name] = character
 		refreshPathTargetList()
-		
+
 		local humanoid = character:WaitForChild("Humanoid")
 		maid:GiveTask(humanoid.Died:Connect(function()
 			pathTargetLists[player.Name] = nil
