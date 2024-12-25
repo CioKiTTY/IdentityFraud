@@ -206,6 +206,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 		continue
 	end
 
+    highlightPlayer(player.Character)
 	Maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
