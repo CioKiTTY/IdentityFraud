@@ -148,7 +148,11 @@ do
 	Toggles["playerESPEnabled"]:OnChanged(function()
 		cfg.playerESPEnabled = Toggles["playerESPEnabled"].Value
 
-        if not cfg.playerESPEnabled then
+        if cfg.playerESPEnabled then
+			for _, player in ipairs(Players:GetPlayers()) do
+                highlightPlayer(player.Character)
+            end
+		else
             for _, player in ipairs(Players:GetPlayers()) do
                 unhighlightPlayer(player.Character)
             end
@@ -158,7 +162,9 @@ do
     Toggles["monstersESPEnabled"]:OnChanged(function()
 		cfg.monstersESPEnabled = Toggles["monstersESPEnabled"].Value
 
-        if not cfg.monstersESPEnabled then
+        if cfg.monstersESPEnabled then
+			highlightMonsters()
+		else
             unhighlightMonsters()
         end
 	end)
