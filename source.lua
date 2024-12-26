@@ -293,15 +293,18 @@ local function loopFindPath()
 		task.spawn(function()
 			isComputingWorldPath = true
 			if not cfg.worldLoopFindPath then
+				isComputingWorldPath = false
 				return
 			end
 
 			if not worldPathTarget then
+				isComputingWorldPath = false
 				return
 			end
 
 			local path = computePathTo(worldPathTarget)
 			if not path then
+				isComputingWorldPath = false
 				return
 			end
 
@@ -315,15 +318,18 @@ local function loopFindPath()
 		task.spawn(function()
 			isComputingPlayerPath = true
 			if not cfg.playerLoopFindPath then
+				isComputingPlayerPath = false
 				return
 			end
 
 			if not playerPathTarget then
+				isComputingPlayerPath = false
 				return
 			end
 
 			local path = computePathTo(playerPathTarget:GetPivot().Position)
 			if not path then
+				isComputingPlayerPath = false
 				return
 			end
 
@@ -337,15 +343,18 @@ local function loopFindPath()
 		task.spawn(function()
 			isComputingMonsterPath = true
 			if not cfg.monsterLoopFindPath then
+				isComputingMonsterPath = false
 				return
 			end
 
 			if not monsterPathTarget then
+				isComputingMonsterPath = false
 				return
 			end
 
 			local path = computePathTo(monsterPathTarget:GetPivot().Position)
 			if not path then
+				isComputingMonsterPath = false
 				return
 			end
 
