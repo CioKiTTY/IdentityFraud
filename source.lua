@@ -31,14 +31,44 @@ local cfg = {}
 cfg.playerESPEnabled = false
 cfg.monstersESPEnabled = false
 
-cfg.loopFindPath = false
-cfg.maxComputeRetries = 3
+cfg.worldLoopFindPath = false
+cfg.worldWaypointColor = Color3.fromRGB(0, 255, 0)
+
+cfg.playerLoopFindPath = false
+cfg.playerWaypointColor = Color3.fromRGB(255, 255, 0)
+
+cfg.monsterLoopFindPath = false
+cfg.monsterWaypointColor = Color3.fromRGB(255, 0, 0)
+
+--<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
+---<< Constants >---
+local LOCATIONS = {
+	["Maze 1 - Exit Door"] = Vector3.new(533.2, 5, -555.5),
+
+	["Maze 2 - Camp 1"] = Vector3.new(954, -7, -417),
+	["Maze 2 - Camp 21"] = Vector3.new(1146, -7, -923),
+	["Maze 2 - Camp 22"] = Vector3.new(1210, -21, -508),
+	["Maze 2 - Camp 23"] = Vector3.new(1216, -7, -491),
+	["Maze 2 - Camp 24"] = Vector3.new(1338, 3, -489),
+	["Maze 2 - Camp 3"] = Vector3.new(825, -7, -107),
+	["Maze 2 - Exit Door"] = Vector3.new(1423, 5, -44),
+
+	["Maze 3 - Exit Door"] = Vector3.new(1786, 3, 277),
+}
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Variables >---
 local maid = Maid.new()
-local pathTargetLists = {}
-local pathTarget = nil :: Model
+
+local playerPathfindTargets = {}
+
+local worldPathTarget = nil :: Vector3
+local playerPathTarget = nil :: Model
+local monsterPathTarget = nil :: Model
+
+local isComputingWorldPath = false
+local isComputingPlayerPath = false
+local isComputingMonsterPath = false
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Game Objects >>---
@@ -48,6 +78,9 @@ local npcs: Model = workspace:WaitForChild("NPCs")
 
 local highlighter: Folder = Instance.new("Folder")
 local waypointStorage: Model = Instance.new("Model")
+local worldWaypoints: Model = Instance.new("Model")
+local playerWaypoints: Model = Instance.new("Model")
+local monsterWaypoints: Model = Instance.new("Model")
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Helper Functions >>---
@@ -61,23 +94,25 @@ local function getHumanoidRootPart()
 	return character:FindFirstChild("HumanoidRootPart")
 end
 
-local function getHumanoid()
-	local character = localPlayer.Character
-
-	if not character then
-		return
-	end
-
-	return character:FindFirstChildWhichIsA("Humanoid")
-end
-
-local function refreshPathTargetList()
+local function getKeys(dict: {})
 	local keys = {}
-	for key, _ in pairs(pathTargetLists) do
+	for key, _ in pairs(dict) do
 		table.insert(keys, key)
 	end
 
-	UILibrary.Options["pathFindTarget"]:SetValues(keys)
+	return keys
+end
+
+local function refreshPathfindTargets(keys: {}, dropdownKey: string)
+	table.insert(keys, 1, "None")
+
+	UILibrary.Options[dropdownKey]:SetValues(keys)
+end
+
+local function refreshPlayerPathfindTargets()
+	local keys = getKeys(playerPathfindTargets)
+
+	refreshPathfindTargets(keys, "playerPathfindTargets")
 end
 
 local function isHighlighted(object: Instance)
@@ -93,7 +128,11 @@ local function mark()
 	local rayOrigin = mouse.UnitRay.Origin
 	local rayDirection = mouse.UnitRay.Direction * 20
 	local raycastParams = RaycastParams.new()
-	raycastParams.FilterDescendantsInstances = { character, workspace.CurrentCamera:WaitForChild("Light_Source"), workspace:WaitForChild(`{localPlayer.Name}_Crumbs`) }
+	raycastParams.FilterDescendantsInstances = {
+		character,
+		workspace.CurrentCamera:WaitForChild("Light_Source"),
+		workspace:WaitForChild(`{localPlayer.Name}_Crumbs`),
+	}
 	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
 	local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
@@ -106,7 +145,16 @@ local function mark()
 
 		local markCFrame = CFrame.new(hitPosition, hitPosition + Vector3.new(lookVector.X, 0, lookVector.Z))
 
+		local rightOffsetCFrame = markCFrame * CFrame.new(2, 0, 0)
+		local leftOffsetCFrame = markCFrame * CFrame.new(-2, 0, 0)
+		local frontOffsetCFrame = markCFrame * CFrame.new(0, 0, -2)
+		local rearOffsetCFrame = markCFrame * CFrame.new(0, 0, 2)
+
 		game:GetService("ReplicatedStorage").Mark:FireServer(markCFrame)
+		game:GetService("ReplicatedStorage").Mark:FireServer(rightOffsetCFrame)
+		game:GetService("ReplicatedStorage").Mark:FireServer(leftOffsetCFrame)
+		game:GetService("ReplicatedStorage").Mark:FireServer(frontOffsetCFrame)
+		game:GetService("ReplicatedStorage").Mark:FireServer(rearOffsetCFrame)
 	end
 end
 
@@ -171,7 +219,9 @@ local function computePathTo(targetPosition: Vector3)
 		return
 	end
 
-	local path = PathfindingService:CreatePath()
+	local path = PathfindingService:CreatePath({
+		AgentCanClimb = true,
+	})
 
 	local numOfRetries = 0
 	local success, errorMessage
@@ -203,8 +253,12 @@ local function computePathTo(targetPosition: Vector3)
 	end
 end
 
-local function visualizePath(path: Path)
-	if path.Status == Enum.PathStatus.Success then
+local function visualizePath(path: Path, color: Color3, parent: Model)
+	if
+		path.Status == Enum.PathStatus.Success
+		or path.Status == Enum.PathStatus.ClosestNoPath
+		or path.Status == Enum.PathStatus.ClosestOutOfRange
+	then
 		local waypoints = path:GetWaypoints()
 
 		for i, point in ipairs(waypoints) do
@@ -214,7 +268,8 @@ local function visualizePath(path: Path)
 			marker.Size = Vector3.new(0.8, 0.8, 0.8)
 			marker.CFrame = CFrame.new(point.Position)
 
-			marker.Color = Color3.fromRGB(0, 255, 0)
+			marker.Color = color
+			marker.Material = Enum.Material.Neon
 			marker.Shape = Enum.PartType.Ball
 
 			marker.Anchored = true
@@ -222,14 +277,9 @@ local function visualizePath(path: Path)
 			marker.CanQuery = false
 			marker.CanTouch = false
 
-			marker.Parent = waypointStorage
+			marker.Parent = parent
 		end
 	else
-		UILibrary:Notify({
-			Title = "3",
-			Content = "3",
-			Duration = 5,
-		})
 		return
 	end
 end
@@ -239,21 +289,71 @@ local function loopFindPath()
 		return false
 	end
 
-	if not cfg.loopFindPath then
-		return true
+	if not isComputingWorldPath then
+		task.spawn(function()
+			isComputingWorldPath = true
+			if not cfg.worldLoopFindPath then
+				return
+			end
+
+			if not worldPathTarget then
+				return
+			end
+
+			local path = computePathTo(worldPathTarget)
+			if not path then
+				return
+			end
+
+			worldWaypoints:ClearAllChildren()
+			visualizePath(path, cfg.worldWaypointColor, worldWaypoints)
+			isComputingWorldPath = false
+		end)
 	end
 
-	if not pathTarget then
-		return true
+	if not isComputingPlayerPath then
+		task.spawn(function()
+			isComputingPlayerPath = true
+			if not cfg.playerLoopFindPath then
+				return
+			end
+
+			if not playerPathTarget then
+				return
+			end
+
+			local path = computePathTo(playerPathTarget:GetPivot().Position)
+			if not path then
+				return
+			end
+
+			playerWaypoints:ClearAllChildren()
+			visualizePath(path, cfg.playerWaypointColor, playerWaypoints)
+			isComputingPlayerPath = false
+		end)
 	end
 
-	local path = computePathTo(pathTarget:GetPivot().Position)
-	if not path then
-		return true
-	end
+	if not isComputingMonsterPath then
+		task.spawn(function()
+			isComputingMonsterPath = true
+			if not cfg.monsterLoopFindPath then
+				return
+			end
 
-	waypointStorage:ClearAllChildren()
-	visualizePath(path)
+			if not monsterPathTarget then
+				return
+			end
+
+			local path = computePathTo(monsterPathTarget:GetPivot().Position)
+			if not path then
+				return
+			end
+
+			monsterWaypoints:ClearAllChildren()
+			visualizePath(path, cfg.monsterWaypointColor, monsterWaypoints)
+			isComputingMonsterPath = false
+		end)
+	end
 
 	return true
 end
@@ -299,7 +399,7 @@ do
 					Duration = 5,
 				})
 			end
-		end
+		end,
 	})
 end
 
@@ -332,45 +432,224 @@ end
 do
 	local tab = Tabs.PathFinder
 
-	tab:CreateDropdown("pathFindTarget", {
-		Title = "Target",
-		Values = { "None" },
-		Multi = false,
-		Default = 1,
-	})
+	do
+		local section = tab:AddSection("World")
 
-	tab:CreateToggle("loopFindPath", {
-		Title = "Find Path Continuously",
-		Default = cfg.loopFindPath,
-	})
+		section:CreateDropdown("worldPathfindTargets", {
+			Title = "Path Find Target",
+			Values = { "None" },
+			Multi = false,
+			Default = 1,
+		})
 
-	tab:CreateButton({
-		Title = "Find Path",
-		Description = "Find the path to the target",
-		Callback = function()
-			if not pathTarget then
+		section:CreateButton({
+			Title = "Find Path",
+			Description = "Find the route to the target",
+			Callback = function()
+				if not worldPathTarget then
+					UILibrary:Notify({
+						Title = "No target",
+						Content = "Please select a target",
+						Duration = 5,
+					})
+					return
+				end
+
 				UILibrary:Notify({
-					Title = "No target",
-					Content = "Please select a target",
-					Duration = 5,
+					Title = "Finding a route...",
+					Content = "Please wait until we found a route to the target",
+					Duration = 1,
 				})
-				return
-			end
+				local path = computePathTo(worldPathTarget)
+				if
+					not path
+					or path.Status == Enum.PathStatus.NoPath
+					or path.Status == Enum.PathStatus.FailStartNotEmpty
+					or path.Status == Enum.PathStatus.FailFinishNotEmpty
+				then
+					UILibrary:Notify({
+						Title = "Route not found",
+						Content = "Move somewhere and try again",
+						SubContent = `Path.Status = {path.Status}`,
+						Duration = 3,
+					})
+					return
+				end
 
-			local path = computePathTo(pathTarget:GetPivot().Position)
-			if not path then
 				UILibrary:Notify({
-					Title = "69",
-					Content = "69",
-					Duration = 5,
+					Title = "Route found!",
+					Content = "We found a route to the target",
+					Duration = 3,
 				})
-				return
-			end
+				worldWaypoints:ClearAllChildren()
+				visualizePath(path, cfg.worldWaypointColor, worldWaypoints)
+			end,
+		})
 
-			waypointStorage:ClearAllChildren()
-			visualizePath(path)
-		end,
-	})
+		section:CreateToggle("worldLoopFindPath", {
+			Title = "Find Path Continuously",
+			Default = cfg.worldLoopFindPath,
+		})
+
+		section:CreateColorpicker("worldWaypointColor", {
+			Title = "Path Color",
+			Default = cfg.worldWaypointColor,
+		})
+
+		section:CreateButton({
+			Title = "Clear Path",
+			Description = "Clear visualized path to the target",
+			Callback = function()
+				worldWaypoints:ClearAllChildren()
+			end,
+		})
+	end
+
+	do
+		local section = tab:AddSection("Player")
+
+		section:CreateDropdown("playerPathfindTargets", {
+			Title = "Path Find Target",
+			Values = { "None" },
+			Multi = false,
+			Default = 1,
+		})
+
+		section:CreateButton({
+			Title = "Find Path",
+			Description = "Find the route to the target",
+			Callback = function()
+				if not playerPathTarget then
+					UILibrary:Notify({
+						Title = "No target",
+						Content = "Please select a target",
+						Duration = 5,
+					})
+					return
+				end
+
+				UILibrary:Notify({
+					Title = "Finding a route...",
+					Content = "Please wait until we found a route to the target",
+					Duration = 1,
+				})
+				local path = computePathTo(playerPathTarget:GetPivot().Position)
+				if
+					not path
+					or path.Status == Enum.PathStatus.NoPath
+					or path.Status == Enum.PathStatus.FailStartNotEmpty
+					or path.Status == Enum.PathStatus.FailFinishNotEmpty
+				then
+					UILibrary:Notify({
+						Title = "Route not found",
+						Content = "Move somewhere and try again",
+						SubContent = `Path.Status = {path.Status}`,
+						Duration = 3,
+					})
+					return
+				end
+
+				UILibrary:Notify({
+					Title = "Route found!",
+					Content = "We found a route to the target",
+					Duration = 3,
+				})
+				playerWaypoints:ClearAllChildren()
+				visualizePath(path, cfg.playerWaypointColor, playerWaypoints)
+			end,
+		})
+
+		section:CreateToggle("playerLoopFindPath", {
+			Title = "Find Path Continuously",
+			Default = false,
+		})
+
+		section:CreateColorpicker("playerWaypointColor", {
+			Title = "Path Color",
+			Default = cfg.playerWaypointColor,
+		})
+
+		section:CreateButton({
+			Title = "Clear Path",
+			Description = "Clear visualized path to the target",
+			Callback = function()
+				playerWaypoints:ClearAllChildren()
+			end,
+		})
+	end
+
+	do
+		local section = tab:AddSection("Monster")
+
+		section:CreateDropdown("monsterPathfindTargets", {
+			Title = "Path Find Target",
+			Values = { "None" },
+			Multi = false,
+			Default = 1,
+		})
+
+		section:CreateButton({
+			Title = "Find Path",
+			Description = "Find the route to the target",
+			Callback = function()
+				if not monsterPathTarget then
+					UILibrary:Notify({
+						Title = "No target",
+						Content = "Please select a target",
+						Duration = 5,
+					})
+					return
+				end
+
+				UILibrary:Notify({
+					Title = "Finding a route...",
+					Content = "Please wait until we found a route to the target",
+					Duration = 1,
+				})
+				local path = computePathTo(monsterPathTarget:GetPivot().Position)
+				if
+					not path
+					or path.Status == Enum.PathStatus.NoPath
+					or path.Status == Enum.PathStatus.FailStartNotEmpty
+					or path.Status == Enum.PathStatus.FailFinishNotEmpty
+				then
+					UILibrary:Notify({
+						Title = "Route not found",
+						Content = "Move somewhere and try again",
+						SubContent = `Path.Status = {path.Status}`,
+						Duration = 3,
+					})
+					return
+				end
+
+				UILibrary:Notify({
+					Title = "Route found!",
+					Content = "We found a route to the target",
+					Duration = 3,
+				})
+				monsterWaypoints:ClearAllChildren()
+				visualizePath(path, cfg.monsterWaypointColor, monsterWaypoints)
+			end,
+		})
+
+		section:CreateToggle("monsterLoopFindPath", {
+			Title = "Find Path Continuously",
+			Default = false,
+		})
+
+		section:CreateColorpicker("monsterWaypointColor", {
+			Title = "Path Color",
+			Default = cfg.monsterWaypointColor,
+		})
+
+		section:CreateButton({
+			Title = "Clear Path",
+			Description = "Clear visualized path to the target",
+			Callback = function()
+				monsterWaypoints:ClearAllChildren()
+			end,
+		})
+	end
 end
 
 --<< Logic >>--
@@ -406,14 +685,55 @@ end
 
 --< PathFinder
 do
-	Elements["loopFindPath"]:OnChanged(function()
-		cfg.loopFindPath = Elements["loopFindPath"].Value
+	-- World
+	Elements["worldPathfindTargets"]:OnChanged(function(value)
+		if LOCATIONS[value] then
+			worldPathTarget = LOCATIONS[value]
+		else
+			worldPathTarget = nil
+		end
 	end)
 
-	Elements["pathFindTarget"]:OnChanged(function(value)
-		if pathTargetLists[value] and pathTargetLists[value].Parent ~= nil then
-			pathTarget = pathTargetLists[value]
+	Elements["worldLoopFindPath"]:OnChanged(function()
+		cfg.worldLoopFindPath = Elements["worldLoopFindPath"].Value
+	end)
+
+	Elements["worldWaypointColor"]:OnChanged(function()
+		cfg.worldWaypointColor = Elements["worldWaypointColor"].Value
+	end)
+
+	-- Player
+	Elements["playerPathfindTargets"]:OnChanged(function(value)
+		if playerPathfindTargets[value] and playerPathfindTargets[value].Parent ~= nil then
+			playerPathTarget = playerPathfindTargets[value]
+		else
+			playerPathTarget = nil
 		end
+	end)
+
+	Elements["playerLoopFindPath"]:OnChanged(function()
+		cfg.playerLoopFindPath = Elements["playerLoopFindPath"].Value
+	end)
+
+	Elements["playerWaypointColor"]:OnChanged(function()
+		cfg.playerWaypointColor = Elements["playerWaypointColor"].Value
+	end)
+
+	-- Monster
+	Elements["monsterPathfindTargets"]:OnChanged(function(value)
+		if npcs:FindFirstChild(value) then
+			monsterPathTarget = npcs:FindFirstChild(value)
+		else
+			monsterPathTarget = nil
+		end
+	end)
+
+	Elements["monsterLoopFindPath"]:OnChanged(function()
+		cfg.monsterLoopFindPath = Elements["monsterLoopFindPath"].Value
+	end)
+
+	Elements["monsterWaypointColor"]:OnChanged(function()
+		cfg.monsterWaypointColor = Elements["monsterWaypointColor"].Value
 	end)
 end
 
@@ -438,6 +758,7 @@ UILibrary.OnUnload:Connect(function()
 	maid:DoCleaning()
 
 	highlighter:Destroy()
+	waypointStorage:Destroy()
 end)
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
@@ -453,20 +774,39 @@ if workspace:FindFirstChild("Waypoints") then
 end
 
 local waypointsHighlight = Instance.new("Highlight")
-waypointsHighlight.FillColor = Color3.fromRGB(0, 255, 0)
+waypointsHighlight.FillTransparency = 1
 waypointsHighlight.Adornee = waypointStorage
 waypointsHighlight.Parent = highlighter
 
 waypointStorage.Name = "Waypoints"
+
+worldWaypoints.Name = "World"
+playerWaypoints.Name = "Player"
+monsterWaypoints.Name = "Monster"
+
+worldWaypoints.Parent = waypointStorage
+playerWaypoints.Parent = waypointStorage
+monsterWaypoints.Parent = waypointStorage
 waypointStorage.Parent = workspace
 
 --<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>-<<->>--
 ---<< Main >>---
-highlightMonsters()
+if cfg.monstersESPEnabled then
+	highlightMonsters()
+end
 
-for _, npc in (npcs:GetChildren()) do
-	pathTargetLists[npc.Name] = npc
-	refreshPathTargetList()
+do
+	local locationKeys = getKeys(LOCATIONS)
+
+	refreshPathfindTargets(locationKeys, "worldPathfindTargets")
+end
+
+do
+	local npcNames = {}
+	for _, npc in (npcs:GetChildren()) do
+		table.insert(npcNames, npc.Name)
+	end
+	refreshPathfindTargets(npcNames, "monsterPathfindTargets")
 end
 
 maid:GiveTask(Players.PlayerAdded:Connect(function(player)
@@ -475,21 +815,21 @@ maid:GiveTask(Players.PlayerAdded:Connect(function(player)
 			highlightPlayer(character)
 		end
 
-		pathTargetLists[player.Name] = character
-		refreshPathTargetList()
+		playerPathfindTargets[player.Name] = character
+		refreshPlayerPathfindTargets()
 
 		local humanoid = character:WaitForChild("Humanoid")
 		maid:GiveTask(humanoid.Died:Connect(function()
-			pathTargetLists[player.Name] = nil
-			refreshPathTargetList()
+			playerPathfindTargets[player.Name] = nil
+			refreshPlayerPathfindTargets()
 		end))
 	end))
 end))
 
 maid:GiveTask(Players.PlayerRemoving:Connect(function(player)
-	if pathTargetLists[player.Name] then
-		pathTargetLists[player.Name] = nil
-		refreshPathTargetList()
+	if playerPathfindTargets[player.Name] then
+		playerPathfindTargets[player.Name] = nil
+		refreshPlayerPathfindTargets()
 	end
 end))
 
@@ -501,28 +841,28 @@ for _, player in ipairs(Players:GetPlayers()) do
 	if cfg.playerESPEnabled then
 		highlightPlayer(player.Character)
 	end
-	pathTargetLists[player.Name] = player.Character
-	refreshPathTargetList()
+	playerPathfindTargets[player.Name] = player.Character
+	refreshPlayerPathfindTargets()
 
 	maid:GiveTask(player.CharacterAdded:Connect(function(character)
 		if cfg.playerESPEnabled then
 			highlightPlayer(character)
 		end
 
-		pathTargetLists[player.Name] = character
-		refreshPathTargetList()
+		playerPathfindTargets[player.Name] = character
+		refreshPlayerPathfindTargets()
 
 		local humanoid = character:WaitForChild("Humanoid")
 		maid:GiveTask(humanoid.Died:Connect(function()
-			pathTargetLists[player.Name] = nil
-			refreshPathTargetList()
+			playerPathfindTargets[player.Name] = nil
+			refreshPlayerPathfindTargets()
 		end))
 	end))
 end
 
 task.spawn(function()
 	while true do
-		task.wait()
+		task.wait(0.5)
 
 		local canContinue = loopFindPath()
 
